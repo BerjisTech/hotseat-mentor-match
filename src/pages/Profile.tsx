@@ -13,6 +13,7 @@ import TagSelector from "@/components/TagSelector";
 import TagSuggestor from "@/components/TagSuggestor";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ProfileWithRole } from "@/types/supabase-extensions";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ const Profile = () => {
   const [profileImage, setProfileImage] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [enhancingBio, setEnhancingBio] = useState(false);
   
   // Suggested tags would come from AI in a real implementation
   const suggestedTags = [
@@ -52,7 +54,7 @@ const Profile = () => {
         .single();
         
       if (error) throw error;
-      return data;
+      return data as unknown as ProfileWithRole;
     }
   });
 
@@ -103,49 +105,51 @@ const Profile = () => {
         
       if (error) throw error;
       
-      // Update expertise tags
-      // First, fetch existing tags to find tag IDs or create new ones
-      const tagPromises = tags.map(async (tagName) => {
-        // Check if tag exists
-        let { data: existingTags } = await supabase
-          .from('expertise_tags')
-          .select('id')
-          .eq('name', tagName);
-          
-        let tagId;
+      // First, delete existing user-tag associations
+      const { error: deleteError } = await supabase
+        .from('user_expertise_tags')
+        .delete()
+        .eq('user_id', session.user.id);
         
-        if (!existingTags || existingTags.length === 0) {
-          // Create new tag
-          const { data: newTag, error: createError } = await supabase
-            .from('expertise_tags')
-            .insert({ name: tagName })
-            .select('id')
-            .single();
-            
-          if (createError) throw createError;
-          tagId = newTag.id;
-        } else {
-          tagId = existingTags[0].id;
-        }
-        
-        // Delete existing user-tag associations
-        await supabase
-          .from('user_expertise_tags')
-          .delete()
-          .eq('user_id', session.user.id);
-          
-        // Create new user-tag association
-        const { error: linkError } = await supabase
-          .from('user_expertise_tags')
-          .insert({
-            user_id: session.user.id,
-            tag_id: tagId
-          });
-          
-        if (linkError) throw linkError;
-      });
+      if (deleteError) throw deleteError;
       
-      await Promise.all(tagPromises);
+      // Then add new user-tag associations
+      if (tags.length > 0) {
+        // Process tags one by one to avoid RLS issues
+        for (const tagName of tags) {
+          // Check if tag exists
+          let { data: existingTags } = await supabase
+            .from('expertise_tags')
+            .select('id')
+            .eq('name', tagName);
+            
+          let tagId;
+          
+          if (!existingTags || existingTags.length === 0) {
+            // Create new tag
+            const { data: newTag, error: createError } = await supabase
+              .from('expertise_tags')
+              .insert({ name: tagName })
+              .select('id')
+              .single();
+              
+            if (createError) throw createError;
+            tagId = newTag.id;
+          } else {
+            tagId = existingTags[0].id;
+          }
+          
+          // Create new user-tag association
+          const { error: linkError } = await supabase
+            .from('user_expertise_tags')
+            .insert({
+              user_id: session.user.id,
+              tag_id: tagId
+            });
+            
+          if (linkError) throw linkError;
+        }
+      }
     },
     onSuccess: () => {
       toast({
@@ -220,6 +224,48 @@ const Profile = () => {
   const handleAddTag = (tag: string) => {
     if (!tags.includes(tag)) {
       setTags([...tags, tag]);
+    }
+  };
+
+  // Function to enhance bio with AI (simulated)
+  const enhanceBio = async () => {
+    if (!bio.trim()) return;
+    
+    setEnhancingBio(true);
+    
+    try {
+      // Simulate AI processing time
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Simple enhancement logic (would be replaced with actual AI in production)
+      const enhancedBio = bio.trim()
+        .replace(/^I am/i, "As a professional,")
+        .replace(/^I have/i, "With extensive experience, I have")
+        .replace(/^I work/i, "I specialize in working")
+        .replace(/^I specialize/i, "My expertise lies in specializing");
+        
+      // Add some professional flair
+      const enhancedParts = [
+        enhancedBio,
+        "I am passionate about delivering high-quality, scalable solutions.",
+        "I enjoy collaborating with teams to solve complex problems efficiently."
+      ];
+      
+      const finalBio = enhancedParts.join(" ");
+      setBio(finalBio.slice(0, 500)); // Limit to 500 chars
+      
+      toast({
+        title: "Bio enhanced",
+        description: "Your professional bio has been improved with AI assistance.",
+      });
+    } catch (error) {
+      toast({
+        title: "Enhancement failed",
+        description: "Unable to enhance your bio. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setEnhancingBio(false);
     }
   };
 
@@ -406,9 +452,10 @@ const Profile = () => {
               <Button 
                 className="w-full" 
                 variant="outline"
-                disabled={!bio.trim()}
+                disabled={!bio.trim() || enhancingBio}
+                onClick={enhanceBio}
               >
-                Enhance My Bio
+                {enhancingBio ? "Enhancing..." : "Enhance My Bio"}
               </Button>
               <p className="text-sm text-muted-foreground">
                 Our AI can suggest improvements to make your bio more effective at showcasing your expertise.
