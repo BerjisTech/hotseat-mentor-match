@@ -1,42 +1,113 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, Flame, Github, Mail } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Flame, Google, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate("/dashboard");
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate login - in a real app this would use Supabase Auth
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
       toast({
         title: "Login Successful",
         description: "Welcome back to HotSeat.live!",
       });
       
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "An error occurred during login",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-      window.location.href = "/dashboard";
-    }, 1500);
+    }
   };
 
-  const handleGoogleLogin = () => {
-    // This would use Supabase Auth with Google provider
-    toast({
-      title: "Google login not implemented",
-      description: "This would connect to Supabase Auth in a real implementation.",
-    });
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Registration Successful",
+        description: "Welcome to HotSeat.live! Please check your email to verify your account.",
+      });
+      
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "An error occurred during registration",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Google login failed",
+        description: error.message || "An error occurred during Google login",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -112,7 +183,7 @@ const Login = () => {
                     type="button"
                     onClick={handleGoogleLogin}
                   >
-                    <Mail className="h-4 w-4" />
+                    <Google className="h-4 w-4" />
                     <span>Google</span>
                   </Button>
                 </div>
@@ -121,7 +192,7 @@ const Login = () => {
           </TabsContent>
           
           <TabsContent value="register">
-            <form onSubmit={handleEmailLogin}>
+            <form onSubmit={handleEmailSignup}>
               <CardContent className="space-y-4 pt-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Full Name</Label>
@@ -129,6 +200,8 @@ const Login = () => {
                     id="name"
                     placeholder="John Doe"
                     type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     required
                   />
                 </div>
@@ -138,6 +211,8 @@ const Login = () => {
                     id="register-email"
                     placeholder="you@example.com"
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
@@ -147,12 +222,14 @@ const Login = () => {
                     id="register-password"
                     placeholder="••••••••"
                     type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                 </div>
                 
-                <Button className="w-full" type="submit">
-                  Create Account
+                <Button className="w-full" type="submit" disabled={loading}>
+                  {loading ? "Creating Account..." : "Create Account"}
                 </Button>
                 
                 <div className="relative flex items-center justify-center">
@@ -171,7 +248,7 @@ const Login = () => {
                     type="button"
                     onClick={handleGoogleLogin}
                   >
-                    <Mail className="h-4 w-4" />
+                    <Google className="h-4 w-4" />
                     <span>Google</span>
                   </Button>
                 </div>
