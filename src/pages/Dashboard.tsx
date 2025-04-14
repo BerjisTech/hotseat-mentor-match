@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, Clock, Info, Settings, ToggleLeft, User, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,6 +19,7 @@ import TagSelector from "@/components/TagSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { ProfileWithRole } from "@/types/supabase-extensions";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ const Dashboard = () => {
         .single();
         
       if (error) throw error;
-      return data;
+      return data as unknown as ProfileWithRole;
     }
   });
 

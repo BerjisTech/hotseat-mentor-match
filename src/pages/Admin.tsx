@@ -46,7 +46,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProfileWithRole, ProfileUpdateWithRole } from "@/types/supabase-extensions";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -74,7 +74,10 @@ const Admin = () => {
         
       if (error) throw error;
       
-      if (data.role !== 'admin' && data.role !== 'superadmin') {
+      // Cast data to our extended type
+      const profileWithRole = data as unknown as ProfileWithRole;
+      
+      if (profileWithRole.role !== 'admin' && profileWithRole.role !== 'superadmin') {
         toast({
           title: "Access Denied",
           description: "You don't have permission to access the admin area.",
@@ -84,7 +87,7 @@ const Admin = () => {
         return null;
       }
       
-      return data;
+      return profileWithRole;
     }
   });
 
@@ -105,7 +108,8 @@ const Admin = () => {
       const { data, error } = await query;
         
       if (error) throw error;
-      return data || [];
+      // Cast to our extended type
+      return (data || []) as unknown as ProfileWithRole[];
     },
     enabled: !!currentUser,
   });
@@ -147,9 +151,11 @@ const Admin = () => {
   // Update user role mutation
   const updateUserRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const updateData: ProfileUpdateWithRole = { role };
+      
       const { error } = await supabase
         .from('profiles')
-        .update({ role })
+        .update(updateData)
         .eq('id', userId);
         
       if (error) throw error;
@@ -356,7 +362,7 @@ const Admin = () => {
                                 : "outline"
                             }
                           >
-                            {user.role}
+                            {user.role || 'user'}
                           </Badge>
                         </TableCell>
                         <TableCell>
