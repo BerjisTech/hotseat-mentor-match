@@ -1,6 +1,7 @@
 
-import { useState } from "react";
-import { Calendar, Clock, Info, Settings, ToggleLeft, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Calendar, Clock, Info, Settings, ToggleLeft, User, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,45 +17,124 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import TagSelector from "@/components/TagSelector";
-import { Link } from "react-router-dom";
-
-// Mock data for past calls
-const pastCalls = [
-  {
-    id: "call-1",
-    user: "Michael Chen",
-    tags: ["javascript", "react", "debugging"],
-    startTime: "2025-04-10T14:30:00",
-    endTime: "2025-04-10T15:05:00",
-    duration: 35,
-  },
-  {
-    id: "call-2",
-    user: "Emma Williams",
-    tags: ["ui-design", "figma", "prototyping"],
-    startTime: "2025-04-08T10:15:00",
-    endTime: "2025-04-08T10:45:00",
-    duration: 30,
-  },
-  {
-    id: "call-3",
-    user: "James Rodriguez",
-    tags: ["node.js", "express", "mongodb"],
-    startTime: "2025-04-05T16:00:00",
-    endTime: "2025-04-05T16:40:00",
-    duration: 40,
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [isAvailable, setIsAvailable] = useState(false);
-  const [expertiseTags, setExpertiseTags] = useState<string[]>([
-    "react",
-    "javascript",
-    "typescript",
-    "web-development",
-  ]);
+  const [expertiseTags, setExpertiseTags] = useState<string[]>([]);
 
+  // Fetch user profile and calls
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['dashboardProfile'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/login');
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch call history
+  const { data: calls, isLoading: callsLoading } = useQuery({
+    queryKey: ['userCalls'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [];
+      
+      const { data, error } = await supabase
+        .from('calls')
+        .select('*')
+        .or(`expert_id.eq.${session.user.id},seeker_id.eq.${session.user.id}`)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Fetch user's expertise tags
+  const { data: userTags } = useQuery({
+    queryKey: ['dashboardExpertiseTags'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [];
+      
+      const { data, error } = await supabase
+        .from('user_expertise_tags')
+        .select('expertise_tags(name)')
+        .eq('user_id', session.user.id);
+        
+      if (error) throw error;
+      
+      // Extract tag names from the query result
+      return data.map(tag => tag.expertise_tags?.name || '').filter(Boolean);
+    }
+  });
+
+  // Update availability mutation
+  const updateAvailability = useMutation({
+    mutationFn: async (available: boolean) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No active session");
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_available: available })
+        .eq('id', session.user.id);
+        
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: variables ? "You are now available" : "You are now offline",
+        description: variables 
+          ? "Users can now find you for help sessions." 
+          : "You will not receive new help requests.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "An error occurred while updating your availability.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update effect based on fetched data
+  useEffect(() => {
+    if (profile) {
+      setIsAvailable(profile.is_available || false);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (userTags) {
+      setExpertiseTags(userTags);
+    }
+  }, [userTags]);
+
+  // Handle availability toggle
+  const handleAvailabilityChange = (available: boolean) => {
+    setIsAvailable(available);
+    updateAvailability.mutate(available);
+  };
+
+  // Format date and time
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -70,16 +150,44 @@ const Dashboard = () => {
     });
   };
 
+  // Calculate call duration in minutes
+  const calculateDuration = (startTime: string, endTime: string | null) => {
+    if (!endTime) return "In progress";
+    
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    const durationMs = end - start;
+    
+    return Math.round(durationMs / 60000); // Convert to minutes
+  };
+
+  // Check if user is admin or superadmin
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
+
+  if (profileLoading) {
+    return <div className="flex justify-center items-center min-h-[50vh]">Loading dashboard...</div>;
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/profile">
-            <Settings className="mr-2 h-4 w-4" />
-            Edit Profile
-          </Link>
-        </Button>
+        <div className="space-x-2">
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm" className="mr-2">
+              <Link to="/admin">
+                <Settings className="mr-2 h-4 w-4" />
+                Admin Panel
+              </Link>
+            </Button>
+          )}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/profile">
+              <User className="mr-2 h-4 w-4" />
+              Edit Profile
+            </Link>
+          </Button>
+        </div>
       </div>
       
       <Tabs defaultValue="overview" className="space-y-6">
@@ -104,7 +212,7 @@ const Dashboard = () => {
                   </span>
                   <Switch
                     checked={isAvailable}
-                    onCheckedChange={setIsAvailable}
+                    onCheckedChange={handleAvailabilityChange}
                     className="data-[state=checked]:bg-hotseat-500"
                   />
                 </div>
@@ -116,7 +224,7 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium">Total Calls</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">15</div>
+                <div className="text-2xl font-bold">{calls?.length || 0}</div>
               </CardContent>
             </Card>
             
@@ -127,7 +235,15 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">8.5</div>
+                <div className="text-2xl font-bold">
+                  {calls?.reduce((total, call) => {
+                    if (call.end_time) {
+                      const duration = calculateDuration(call.start_time, call.end_time);
+                      return typeof duration === 'number' ? total + (duration / 60) : total;
+                    }
+                    return total;
+                  }, 0).toFixed(1) || 0}
+                </div>
               </CardContent>
             </Card>
             
@@ -151,42 +267,60 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Topics</TableHead>
-                    <TableHead className="text-right">Duration</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pastCalls.slice(0, 3).map((call) => (
-                    <TableRow key={call.id}>
-                      <TableCell className="font-medium">{call.user}</TableCell>
-                      <TableCell>{formatDate(call.startTime)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {call.tags.map((tag) => (
-                            <Badge key={tag} variant="outline" className="tag">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {call.duration} min
-                      </TableCell>
+              {callsLoading ? (
+                <div className="py-8 text-center">Loading calls...</div>
+              ) : calls && calls.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Topics</TableHead>
+                      <TableHead className="text-right">Duration</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {calls.slice(0, 3).map((call) => (
+                      <TableRow key={call.id}>
+                        <TableCell className="font-medium">
+                          {call.expert_id === profile?.id ? "Seeker" : "Expert"}
+                        </TableCell>
+                        <TableCell>{formatDate(call.start_time)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {call.tags?.map((tag) => (
+                              <Badge key={tag} variant="outline" className="tag">
+                                {tag}
+                              </Badge>
+                            )) || <span className="text-muted-foreground text-sm">No tags</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {typeof calculateDuration(call.start_time, call.end_time) === 'number' 
+                            ? `${calculateDuration(call.start_time, call.end_time)} min` 
+                            : calculateDuration(call.start_time, call.end_time)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-12 text-center">
+                  <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-2 text-lg font-medium">No calls yet</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    When you complete help sessions, they will appear here.
+                  </p>
+                </div>
+              )}
             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button asChild variant="ghost" size="sm">
-                <Link to="?tab=history">View All Calls</Link>
-              </Button>
-            </CardFooter>
+            {calls && calls.length > 0 && (
+              <CardFooter className="flex justify-end">
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="?tab=history">View All Calls</Link>
+                </Button>
+              </CardFooter>
+            )}
           </Card>
         </TabsContent>
         
@@ -206,7 +340,7 @@ const Dashboard = () => {
                 <Switch
                   id="availability"
                   checked={isAvailable}
-                  onCheckedChange={setIsAvailable}
+                  onCheckedChange={handleAvailabilityChange}
                   className="data-[state=checked]:bg-hotseat-500"
                 />
                 <label htmlFor="availability" className="text-lg font-medium cursor-pointer">
@@ -282,11 +416,13 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {pastCalls.length > 0 ? (
+              {callsLoading ? (
+                <div className="py-8 text-center">Loading calls...</div>
+              ) : calls && calls.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
                       <TableHead>Topics</TableHead>
@@ -294,24 +430,29 @@ const Dashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pastCalls.map((call) => (
+                    {calls.map((call) => (
                       <TableRow key={call.id}>
-                        <TableCell className="font-medium">{call.user}</TableCell>
-                        <TableCell>{formatDate(call.startTime)}</TableCell>
+                        <TableCell className="font-medium">
+                          {call.expert_id === profile?.id ? "Expert" : "Seeker"}
+                        </TableCell>
+                        <TableCell>{formatDate(call.start_time)}</TableCell>
                         <TableCell>
-                          {formatTime(call.startTime)} - {formatTime(call.endTime)}
+                          {formatTime(call.start_time)} 
+                          {call.end_time && ` - ${formatTime(call.end_time)}`}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {call.tags.map((tag) => (
+                            {call.tags?.map((tag) => (
                               <Badge key={tag} variant="outline" className="tag">
                                 {tag}
                               </Badge>
-                            ))}
+                            )) || <span className="text-muted-foreground text-sm">No tags</span>}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {call.duration} min
+                          {typeof calculateDuration(call.start_time, call.end_time) === 'number' 
+                            ? `${calculateDuration(call.start_time, call.end_time)} min` 
+                            : calculateDuration(call.start_time, call.end_time)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -330,7 +471,7 @@ const Dashboard = () => {
             <CardFooter className="border-t py-4">
               <div className="flex items-center justify-between w-full">
                 <p className="text-sm text-muted-foreground">
-                  Showing {pastCalls.length} calls
+                  Showing {calls?.length || 0} calls
                 </p>
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" disabled>

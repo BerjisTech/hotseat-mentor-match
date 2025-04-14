@@ -12,6 +12,7 @@ import Profile from "@/pages/Profile";
 import CallRoom from "@/pages/CallRoom";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
+import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
               <Route index element={<Home />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="admin" element={<Admin />} />
               <Route path="call/:id" element={<CallRoom />} />
               <Route path="login" element={<Login />} />
               <Route path="*" element={<NotFound />} />
