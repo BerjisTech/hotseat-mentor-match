@@ -1,11 +1,12 @@
 
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CallRoomComponent from "@/components/CallRoom";
 import SummaryModal from "@/components/SummaryModal";
+import { toast } from "@/components/ui/sonner";
 
 // Mock expert data based on id
 const getMockExpert = (id: string) => {
@@ -37,8 +38,10 @@ const getMockExpert = (id: string) => {
 
 const CallRoom = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [userName, setUserName] = useState("Guest User");
   
   // Get mock expert data based on id
   const expert = getMockExpert(id || "1");
@@ -47,25 +50,47 @@ const CallRoom = () => {
   useEffect(() => {
     document.title = `Call with ${expert.name} | HotSeat.live`;
     
+    // Get user name from local storage or session
+    const storedUserName = localStorage.getItem("userName") || "Guest User";
+    setUserName(storedUserName);
+    
+    // Function to create the Daily.co room (in a real app)
+    const createDailyRoom = async () => {
+      try {
+        // This would be an API call to your backend which creates a Daily.co room
+        // const response = await fetch('/api/rooms', { method: 'POST' });
+        // const data = await response.json();
+        // console.log("Daily.co room created:", data.url);
+        
+        console.log("Call room loaded with ID:", id);
+      } catch (error) {
+        console.error("Error creating Daily.co room:", error);
+        toast.error("Failed to create video call room");
+      }
+    };
+    
+    createDailyRoom();
+    
     return () => {
       document.title = "HotSeat.live";
     };
-  }, [expert.name]);
+  }, [expert.name, id]);
 
   // Handle ending the call
   const handleEndCall = () => {
     setIsCallEnded(true);
     setIsSummaryModalOpen(true);
+    toast.info("Call has ended");
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" asChild>
-          <a href="/" className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+          <div className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
             Back to Home
-          </a>
+          </div>
         </Button>
         {isCallEnded && (
           <Button 
@@ -108,7 +133,7 @@ const CallRoom = () => {
             expertName={expert.name}
             expertImage={expert.profileImage}
             callId={id || ""}
-            userName="Your Name"
+            userName={userName}
           />
         </div>
       )}
@@ -118,7 +143,7 @@ const CallRoom = () => {
         onClose={() => setIsSummaryModalOpen(false)}
         callId={id || ""}
         expertName={expert.name}
-        userName="Your Name"
+        userName={userName}
       />
     </div>
   );
