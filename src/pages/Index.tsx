@@ -1,16 +1,10 @@
 
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 
 const Index = () => {
-  const navigate = useNavigate();
-  
-  // Redirect to the home page
-  useEffect(() => {
-    navigate('/');
-  }, [navigate]);
-  
-  return null;
+  // Use Navigate component instead of useNavigate hook
+  // This is safer and avoids context issues
+  return <Navigate to="/" replace />;
 };
 
 export default Index;
