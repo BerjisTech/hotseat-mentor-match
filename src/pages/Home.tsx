@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/home/SearchBar";
 import HeroSection from "@/components/home/HeroSection";
@@ -6,7 +5,6 @@ import ExpertList from "@/components/home/ExpertList";
 import AvailabilityToggle from "@/components/home/AvailabilityToggle";
 import TagFilter from "@/components/TagFilter";
 import AIAssist from "@/components/AIAssist";
-import AdminControls from "@/components/home/AdminControls";
 import { ExpertProps } from "@/components/ExpertCard";
 
 // Mock data for experts (keep for now until we integrate with backend)
@@ -71,9 +69,9 @@ const allTags = Array.from(
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [filteredExperts, setFilteredExperts] = useState(mockExperts);
+  const [filteredExperts, setFilteredExperts] = useState<ExpertProps[]>(mockExperts);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-  const [experts, setExperts] = useState(mockExperts);
+  const [experts, setExperts] = useState<ExpertProps[]>(mockExperts);
 
   // Filter experts based on search term, selected tags, and availability
   useEffect(() => {
@@ -115,19 +113,9 @@ const Home = () => {
     });
   };
 
-  // Handle updating experts (for admin controls)
-  const handleUpdateExperts = (updatedExperts: ExpertProps[]) => {
-    setExperts(updatedExperts);
-  };
-
   return (
     <div className="flex flex-col gap-8">
       <HeroSection />
-      
-      <AdminControls 
-        experts={experts}
-        onUpdateExperts={handleUpdateExperts}
-      />
       
       <section className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
