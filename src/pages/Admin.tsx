@@ -1,17 +1,31 @@
 
 import { useNavigate } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ProfileWithRole } from "@/types/supabase-extensions";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarTrigger,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, Users, Phone, Tags, Settings, Layout } from "lucide-react";
+import { Outlet, Routes, Route, Link, useLocation } from "react-router-dom";
 import UsersTab from "@/components/admin/UsersTab";
 import CallsTab from "@/components/admin/CallsTab";
 import TagsTab from "@/components/admin/TagsTab";
+import AdminControls from "@/components/admin/AdminControls";
 
-const Admin = () => {
+const AdminLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   // Check if user is admin
@@ -56,35 +70,148 @@ const Admin = () => {
     return null; // Navigation handled in the query
   }
 
+  const isActive = (path: string) => {
+    return location.pathname === `/admin${path}`;
+  };
+
+  return (
+    <SidebarProvider>
+      <div className="flex w-full min-h-[calc(100vh-6rem)]">
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center px-2">
+              <Settings className="h-6 w-6 mr-2 text-hotseat-500" />
+              <h2 className="text-lg font-semibold">Admin Panel</h2>
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive("") || isActive("/")}
+                  tooltip="Dashboard"
+                >
+                  <Link to="/admin">
+                    <Layout className="h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive("/users")}
+                  tooltip="Users"
+                >
+                  <Link to="/admin/users">
+                    <Users className="h-4 w-4" />
+                    <span>Users</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive("/calls")}
+                  tooltip="Calls"
+                >
+                  <Link to="/admin/calls">
+                    <Phone className="h-4 w-4" />
+                    <span>Calls</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive("/tags")}
+                  tooltip="Tags"
+                >
+                  <Link to="/admin/tags">
+                    <Tags className="h-4 w-4" />
+                    <span>Expertise Tags</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarContent>
+        </Sidebar>
+        
+        <SidebarInset className="relative p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/dashboard')}
+                className="mr-4"
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </div>
+            <SidebarTrigger />
+          </div>
+          
+          <Outlet />
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  );
+};
+
+const AdminDashboard = () => {
+  const { data: currentUser } = useQuery({
+    queryKey: ['adminUser'],
+  });
+  
+  // This will be displayed on the main admin route
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>
-          Back to Dashboard
-        </Button>
+      <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Link to="/admin/users" className="group">
+          <div className="border rounded-lg p-6 h-full hover:border-hotseat-500 transition-all">
+            <Users className="h-10 w-10 mb-4 text-muted-foreground group-hover:text-hotseat-500 transition-colors" />
+            <h3 className="text-xl font-medium mb-2">User Management</h3>
+            <p className="text-muted-foreground">Manage users, roles, and permissions</p>
+          </div>
+        </Link>
+        
+        <Link to="/admin/calls" className="group">
+          <div className="border rounded-lg p-6 h-full hover:border-hotseat-500 transition-all">
+            <Phone className="h-10 w-10 mb-4 text-muted-foreground group-hover:text-hotseat-500 transition-colors" />
+            <h3 className="text-xl font-medium mb-2">Call History</h3>
+            <p className="text-muted-foreground">View and manage call records</p>
+          </div>
+        </Link>
+        
+        <Link to="/admin/tags" className="group">
+          <div className="border rounded-lg p-6 h-full hover:border-hotseat-500 transition-all">
+            <Tags className="h-10 w-10 mb-4 text-muted-foreground group-hover:text-hotseat-500 transition-colors" />
+            <h3 className="text-xl font-medium mb-2">Expertise Tags</h3>
+            <p className="text-muted-foreground">Manage expertise categories and tags</p>
+          </div>
+        </Link>
       </div>
       
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="calls">Calls</TabsTrigger>
-          <TabsTrigger value="tags">Expertise Tags</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="users">
-          <UsersTab currentUser={currentUser} />
-        </TabsContent>
-        
-        <TabsContent value="calls">
-          <CallsTab currentUser={currentUser} />
-        </TabsContent>
-        
-        <TabsContent value="tags">
-          <TagsTab currentUser={currentUser} />
-        </TabsContent>
-      </Tabs>
+      <AdminControls experts={[]} onUpdateExperts={() => {}} />
     </div>
+  );
+};
+
+const Admin = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="users" element={<UsersTab />} />
+        <Route path="calls" element={<CallsTab />} />
+        <Route path="tags" element={<TagsTab />} />
+      </Route>
+    </Routes>
   );
 };
 

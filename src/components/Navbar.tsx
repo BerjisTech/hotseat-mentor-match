@@ -2,33 +2,57 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Flame, LogOut } from "lucide-react";
+import { Flame, LogOut, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
+import { ProfileWithRole } from "@/types/supabase-extensions";
 
 const Navbar = () => {
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<ProfileWithRole | null>(null);
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_, session) => {
         setSession(session);
+        if (session) {
+          fetchUserProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
       }
     );
 
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) {
+        fetchUserProfile(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (!error && data) {
+      setProfile(data as unknown as ProfileWithRole);
+    }
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
   return (
     <header className="border-b bg-background">
@@ -52,6 +76,12 @@ const Navbar = () => {
               <Link to="/profile" className="text-sm font-medium transition-colors hover:text-hotseat-500">
                 Profile
               </Link>
+              {isAdmin && (
+                <Link to="/admin" className="text-sm font-medium transition-colors hover:text-hotseat-500 flex items-center">
+                  <Settings className="h-4 w-4 mr-1" />
+                  Admin
+                </Link>
+              )}
             </>
           ) : null}
         </nav>

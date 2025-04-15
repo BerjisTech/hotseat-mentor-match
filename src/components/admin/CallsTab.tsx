@@ -12,13 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Phone } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ProfileWithRole } from "@/types/supabase-extensions";
 
-interface CallsTabProps {
-  currentUser: ProfileWithRole;
-}
+const CallsTab = () => {
+  // Fetch current user from the React Query cache
+  const { data: currentUser } = useQuery({
+    queryKey: ['adminUser'],
+  });
 
-const CallsTab = ({ currentUser }: CallsTabProps) => {
   // Fetch all calls
   const { data: calls, isLoading: callsLoading } = useQuery({
     queryKey: ['allCalls'],

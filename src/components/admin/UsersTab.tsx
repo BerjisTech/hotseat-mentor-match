@@ -28,15 +28,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProfileWithRole } from "@/types/supabase-extensions";
 import { useNavigate } from "react-router-dom";
 
-interface UsersTabProps {
-  currentUser: ProfileWithRole;
-}
-
-const UsersTab = ({ currentUser }: UsersTabProps) => {
+const UsersTab = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch current user from the React Query cache
+  const { data: currentUser } = useQuery({
+    queryKey: ['adminUser'],
+  });
 
   // Fetch all users
   const { data: users, isLoading: usersLoading } = useQuery({
@@ -228,13 +229,13 @@ const UsersTab = ({ currentUser }: UsersTabProps) => {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleRoleChange(user.id, 'admin')}
-                          disabled={user.role === 'admin' || currentUser.role !== 'superadmin'}
+                          disabled={user.role === 'admin' || currentUser?.role !== 'superadmin'}
                         >
                           Set as Admin
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleRoleChange(user.id, 'superadmin')}
-                          disabled={user.role === 'superadmin' || currentUser.role !== 'superadmin'}
+                          disabled={user.role === 'superadmin' || currentUser?.role !== 'superadmin'}
                         >
                           Set as Superadmin
                         </DropdownMenuItem>
