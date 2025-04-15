@@ -1,14 +1,13 @@
-
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, Flame, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import ExpertCard from "@/components/ExpertCard";
+import SearchBar from "@/components/home/SearchBar";
+import HeroSection from "@/components/home/HeroSection";
+import ExpertList from "@/components/home/ExpertList";
+import AvailabilityToggle from "@/components/home/AvailabilityToggle";
 import TagFilter from "@/components/TagFilter";
 import AIAssist from "@/components/AIAssist";
+import { ExpertProps } from "@/components/ExpertCard";
 
-// Mock data for experts
+// Mock data for experts (keep for now until we integrate with backend)
 const mockExperts = [
   {
     id: "1",
@@ -77,7 +76,6 @@ const Home = () => {
   useEffect(() => {
     let filtered = mockExperts;
     
-    // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -88,14 +86,12 @@ const Home = () => {
       );
     }
     
-    // Filter by selected tags
     if (selectedTags.length > 0) {
       filtered = filtered.filter((expert) =>
         selectedTags.every((tag) => expert.tags.includes(tag))
       );
     }
     
-    // Filter by availability
     if (showOnlyAvailable) {
       filtered = filtered.filter((expert) => expert.isAvailable);
     }
@@ -105,7 +101,6 @@ const Home = () => {
 
   // Handle the AI assistant submission (placeholder)
   const handleAIAssist = async (input: string): Promise<string> => {
-    // In a real app, this would call OpenAI or Claude
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(`Based on your request "${input}", I recommend:
@@ -119,50 +114,19 @@ const Home = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="text-center">
-        <div className="mx-auto max-w-3xl space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Get expert help <span className="text-hotseat-500">on demand</span>
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            Connect with live experts ready to solve your problems right now through
-            video calls based on their expertise.
-          </p>
-          <div className="flex items-center justify-center space-x-4">
-            <Button asChild>
-              <Link to="/dashboard">
-                Start Helping Others
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/login">Join Now</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
       
       <section className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
           <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search experts or topics..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button
-              variant="outline"
-              className={showOnlyAvailable ? "bg-hotseat-100 dark:bg-hotseat-900" : ""}
-              onClick={() => setShowOnlyAvailable(!showOnlyAvailable)}
-            >
-              <Flame className={`mr-2 h-4 w-4 ${showOnlyAvailable ? "text-hotseat-500" : ""}`} />
-              Live Now
-            </Button>
+            <SearchBar 
+              searchTerm={searchTerm} 
+              onSearchChange={setSearchTerm} 
+            />
+            <AvailabilityToggle
+              showOnlyAvailable={showOnlyAvailable}
+              onToggle={() => setShowOnlyAvailable(!showOnlyAvailable)}
+            />
           </div>
           
           <TagFilter
@@ -175,20 +139,7 @@ const Home = () => {
             onClearTags={() => setSelectedTags([])}
           />
           
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredExperts.length > 0 ? (
-              filteredExperts.map((expert) => (
-                <ExpertCard key={expert.id} {...expert} />
-              ))
-            ) : (
-              <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-lg font-medium">No experts found</p>
-                <p className="text-muted-foreground">
-                  Try adjusting your filters or search term
-                </p>
-              </div>
-            )}
-          </div>
+          <ExpertList experts={filteredExperts} />
         </div>
         
         <div>
