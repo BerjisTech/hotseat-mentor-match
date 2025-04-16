@@ -39,6 +39,9 @@ const UsersTab = () => {
     queryKey: ['adminUser'],
   });
 
+  // Properly typed currentUser
+  const typedCurrentUser = currentUser as ProfileWithRole | undefined;
+
   // Fetch all users
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ['allUsers', searchTerm],
@@ -54,7 +57,7 @@ const UsersTab = () => {
       const { data, error } = await query;
         
       if (error) throw error;
-      return (data || []) as unknown as ProfileWithRole[];
+      return (data || []) as ProfileWithRole[];
     },
     enabled: !!currentUser,
   });
@@ -113,7 +116,7 @@ const UsersTab = () => {
 
   // Handle user role change
   const handleRoleChange = (userId: string, role: string) => {
-    if (currentUser?.role !== 'superadmin' && role === 'superadmin') {
+    if (typedCurrentUser?.role !== 'superadmin' && role === 'superadmin') {
       toast({
         title: "Permission denied",
         description: "Only superadmins can assign the superadmin role.",
@@ -229,13 +232,13 @@ const UsersTab = () => {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleRoleChange(user.id, 'admin')}
-                          disabled={user.role === 'admin' || currentUser?.role !== 'superadmin'}
+                          disabled={user.role === 'admin' || typedCurrentUser?.role !== 'superadmin'}
                         >
                           Set as Admin
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleRoleChange(user.id, 'superadmin')}
-                          disabled={user.role === 'superadmin' || currentUser?.role !== 'superadmin'}
+                          disabled={user.role === 'superadmin' || typedCurrentUser?.role !== 'superadmin'}
                         >
                           Set as Superadmin
                         </DropdownMenuItem>

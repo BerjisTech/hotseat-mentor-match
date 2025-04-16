@@ -25,17 +25,17 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ProfileWithRole } from "@/types/supabase-extensions";
 
-interface TagsTabProps {
-  currentUser: ProfileWithRole;
-}
-
-const TagsTab = ({ currentUser }: TagsTabProps) => {
+const TagsTab = () => {
   const [addTagDialogOpen, setAddTagDialogOpen] = useState(false);
   const [newTag, setNewTag] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch current user from the React Query cache
+  const { data: currentUser } = useQuery({
+    queryKey: ['adminUser'],
+  });
 
   // Fetch all tags
   const { data: tags, isLoading: tagsLoading } = useQuery({
