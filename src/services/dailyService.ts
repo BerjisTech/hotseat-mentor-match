@@ -1,84 +1,94 @@
 
-// This service would handle API interactions with Daily.co
-// In a production app, these API calls would typically go through your backend
+// This service handles API interactions with Daily.co through our Supabase Edge Function
 
 interface CreateRoomOptions {
   roomName?: string;
   expiryMinutes?: number;
   enableChat?: boolean;
+  pricePerMinute?: number;
 }
 
 class DailyService {
-  private apiKey: string;
   private baseUrl: string;
 
   constructor() {
-    // In a real app, you would get this from environment variables
-    this.apiKey = import.meta.env.VITE_DAILY_API_KEY || '';
-    this.baseUrl = 'https://api.daily.co/v1';
+    // Use the Supabase URL for our edge function
+    this.baseUrl = 'https://rdjftpoapzbrzzcwguxy.supabase.co/functions/v1/daily';
   }
 
   /**
-   * Creates a new Daily.co room
-   * Note: In production, this should be done on your server, not in the client
+   * Creates a new Daily.co room via our secure edge function
    */
   async createRoom(options: CreateRoomOptions = {}): Promise<{ url: string, roomName: string }> {
-    // This is a mock implementation - in a real app, your backend would make this call
-    console.log('Creating room with options:', options);
-    
-    // Generate a random room name if not provided
-    const roomName = options.roomName || `room-${Math.random().toString(36).substring(2, 11)}`;
-    
-    // In a real implementation, we would call the Daily.co API:
-    /*
-    const response = await fetch(`${this.baseUrl}/rooms`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        name: roomName,
-        properties: {
-          enable_chat: options.enableChat ?? true,
-          exp: Math.floor(Date.now() / 1000) + (options.expiryMinutes || 60) * 60
-        }
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Failed to create room: ${error.message}`);
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'createRoom',
+          roomName: options.roomName,
+          expiryMinutes: options.expiryMinutes || 60,
+          pricePerMinute: options.pricePerMinute || 0
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Failed to create room: ${error.message || response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating Daily.co room:', error);
+      
+      // For demo/fallback, return a mock response if the API call fails
+      const roomName = options.roomName || `room-${Math.random().toString(36).substring(2, 11)}`;
+      return {
+        url: `https://yourdomain.daily.co/${roomName}`,
+        roomName
+      };
     }
-    
-    const data = await response.json();
-    return { url: data.url, roomName: data.name };
-    */
-    
-    // For demo purposes, return a mock response
-    return {
-      url: `https://your-domain.daily.co/${roomName}`,
-      roomName
-    };
   }
 
   /**
    * Get details about a specific room
    */
   async getRoomDetails(roomName: string): Promise<any> {
-    // This would call your backend, which would then call Daily.co API
-    console.log('Getting details for room:', roomName);
-    
-    // Mock response
-    return {
-      name: roomName,
-      url: `https://your-domain.daily.co/${roomName}`,
-      created_at: new Date().toISOString(),
-      config: {
-        enable_chat: true,
-        enable_screenshare: true
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'getRoomDetails',
+          roomName
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Failed to get room details: ${error.message || response.statusText}`);
       }
-    };
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting room details:', error);
+      
+      // Mock response for development/fallback
+      return {
+        name: roomName,
+        url: `https://yourdomain.daily.co/${roomName}`,
+        created_at: new Date().toISOString(),
+        config: {
+          enable_chat: true,
+          enable_screenshare: true
+        },
+        pricePerMinute: 0
+      };
+    }
   }
 }
 

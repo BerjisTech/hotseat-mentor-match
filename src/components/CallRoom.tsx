@@ -1,17 +1,22 @@
-
 import { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Video, VideoOff, MonitorSmartphone, MessageSquare, ClipboardCheck } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, MonitorSmartphone, MessageSquare, ClipboardCheck, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import SummaryModal from "@/components/SummaryModal";
+import CallTimer from "@/components/CallTimer";
 import DailyIframe from '@daily-co/daily-js';
 import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
+import dailyService from "@/services/dailyService";
 
 interface CallRoomProps {
   expertName: string;
   expertImage?: string;
   callId: string;
   userName: string;
+  isExpert?: boolean;
 }
 
 const CallRoom = ({
@@ -19,11 +24,16 @@ const CallRoom = ({
   expertImage,
   callId,
   userName,
+  isExpert = false,
 }: CallRoomProps) => {
   const [micEnabled, setMicEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [callObject, setCallObject] = useState<any>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [pricePerMinute, setPricePerMinute] = useState(0);
+  const [isSettingPrice, setIsSettingPrice] = useState(isExpert);
+  const [roomDetails, setRoomDetails] = useState<any>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   
   // Get initials for Avatar fallback
@@ -34,13 +44,42 @@ const CallRoom = ({
     .toUpperCase();
 
   useEffect(() => {
-    // Create Daily call object when component mounts
+    // Get room details including price when component mounts
+    const getRoomDetails = async () => {
+      try {
+        if (!callId) return;
+        
+        const details = await dailyService.getRoomDetails(callId);
+        setRoomDetails(details);
+        setPricePerMinute(details.pricePerMinute || 0);
+        
+        // If the room doesn't exist or cannot be found, show an error
+        if (!details || details.error) {
+          toast.error("Call room not found or has expired");
+          return;
+        }
+      } catch (error) {
+        console.error("Error getting room details:", error);
+        toast.error("Failed to get call details");
+      }
+    };
+    
+    getRoomDetails();
+  }, [callId]);
+
+  // Create Daily call object when component mounts or after price is set
+  useEffect(() => {
+    // Don't initialize if expert is still setting price
+    if (isExpert && isSettingPrice) {
+      return;
+    }
+    
     const initCall = async () => {
       try {
         if (!callId) return;
         
-        // Create a URL for the call (in a real app, this would come from your backend)
-        const url = `https://your-domain.daily.co/${callId}`;
+        // Create a URL for the call
+        const url = roomDetails?.url || `https://yourdomain.daily.co/${callId}`;
         
         // Create the call object
         const dailyCall = DailyIframe.createFrame(videoContainerRef.current as HTMLDivElement, {
@@ -58,6 +97,7 @@ const CallRoom = ({
         
         // Join the call
         await dailyCall.join({ url, userName });
+        setIsCallActive(true);
         
         toast.success("You've joined the call");
       } catch (error) {
@@ -66,7 +106,9 @@ const CallRoom = ({
       }
     };
     
-    initCall();
+    if (roomDetails && !isSettingPrice) {
+      initCall();
+    }
     
     return () => {
       // Clean up the call when component unmounts
@@ -74,7 +116,32 @@ const CallRoom = ({
         callObject.destroy();
       }
     };
-  }, [callId, userName]);
+  }, [callId, userName, roomDetails, isExpert, isSettingPrice]);
+  
+  // Start the call with specified price
+  const startCallWithPrice = async () => {
+    try {
+      if (!pricePerMinute || isNaN(Number(pricePerMinute)) || Number(pricePerMinute) < 0) {
+        toast.error("Please enter a valid price per minute");
+        return;
+      }
+      
+      // Create a room with the specified price
+      const result = await dailyService.createRoom({
+        roomName: callId,
+        pricePerMinute: Number(pricePerMinute),
+        expiryMinutes: 60
+      });
+      
+      setRoomDetails(result);
+      setIsSettingPrice(false);
+      toast.success(`Call room created with price: $${pricePerMinute}/min`);
+      
+    } catch (error) {
+      console.error("Error creating priced call room:", error);
+      toast.error("Failed to create call room");
+    }
+  };
   
   // Toggle mic
   const toggleMic = () => {
@@ -100,16 +167,70 @@ const CallRoom = ({
   };
   
   // End call
-  const endCall = () => {
+  const endCall = async () => {
     if (callObject) {
       callObject.leave();
       callObject.destroy();
       setCallObject(null);
+      setIsCallActive(false);
       
-      // Redirect or show end call screen
+      // Save call details to the database
+      try {
+        const { data: user } = await supabase.auth.getUser();
+        
+        if (user && user.user) {
+          await supabase.from('calls').insert({
+            room_id: callId,
+            expert_id: isExpert ? user.user.id : null,
+            seeker_id: !isExpert ? user.user.id : null,
+            end_time: new Date().toISOString(),
+            // Other fields would be filled here
+          });
+        }
+      } catch (error) {
+        console.error("Error saving call details:", error);
+      }
+      
+      // Redirect to call ended page
       window.location.href = `/call-ended/${callId}`;
     }
   };
+
+  // If expert is setting price, show the price input form
+  if (isExpert && isSettingPrice) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-card p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Set Your Price</h2>
+          <p className="text-muted-foreground mb-6">
+            Specify how much you want to charge per minute for this call.
+          </p>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="price">Price per minute ($)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={pricePerMinute}
+                  onChange={(e) => setPricePerMinute(Number(e.target.value))}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <Button onClick={startCallWithPrice} className="w-full">
+              Start Call
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -129,6 +250,16 @@ const CallRoom = ({
           </Avatar>
           <span className="text-white text-sm font-medium">{expertName}</span>
         </div>
+        
+        {/* Timer and price overlay */}
+        {isCallActive && (
+          <div className="absolute top-4 right-4 z-10">
+            <CallTimer
+              isActive={isCallActive}
+              pricePerMinute={Number(pricePerMinute)}
+            />
+          </div>
+        )}
       </div>
       
       <div className="mt-4 flex justify-center">

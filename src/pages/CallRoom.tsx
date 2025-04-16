@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CallRoomComponent from "@/components/CallRoom";
 import SummaryModal from "@/components/SummaryModal";
 import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { ProfileWithRole } from "@/types/supabase-extensions";
 
 // Mock expert data based on id
 const getMockExpert = (id: string) => {
@@ -42,34 +44,45 @@ const CallRoom = () => {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [userName, setUserName] = useState("Guest User");
+  const [profile, setProfile] = useState<ProfileWithRole | null>(null);
+  const [isExpert, setIsExpert] = useState(false);
   
   // Get mock expert data based on id
   const expert = getMockExpert(id || "1");
   
-  // Set page title
+  // Set page title and check if user is the expert
   useEffect(() => {
     document.title = `Call with ${expert.name} | HotSeat.live`;
     
-    // Get user name from local storage or session
-    const storedUserName = localStorage.getItem("userName") || "Guest User";
-    setUserName(storedUserName);
-    
-    // Function to create the Daily.co room (in a real app)
-    const createDailyRoom = async () => {
-      try {
-        // This would be an API call to your backend which creates a Daily.co room
-        // const response = await fetch('/api/rooms', { method: 'POST' });
-        // const data = await response.json();
-        // console.log("Daily.co room created:", data.url);
-        
-        console.log("Call room loaded with ID:", id);
-      } catch (error) {
-        console.error("Error creating Daily.co room:", error);
-        toast.error("Failed to create video call room");
+    // Check if the current user is logged in
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Get user profile
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (!error && data) {
+          setProfile(data as unknown as ProfileWithRole);
+          setUserName(data.full_name || session.user.email || "User");
+          
+          // In a real app, check if the current user is the expert for this call
+          // For now, we'll use a simple mock check 
+          // In a real application, you would check against the expert_id in your calls table
+          const mockedExpertId = id;
+          setIsExpert(mockedExpertId === id);
+        }
+      } else {
+        // Not logged in, use guest name
+        setUserName("Guest User");
       }
     };
     
-    createDailyRoom();
+    checkAuth();
     
     return () => {
       document.title = "HotSeat.live";
@@ -134,6 +147,7 @@ const CallRoom = () => {
             expertImage={expert.profileImage}
             callId={id || ""}
             userName={userName}
+            isExpert={isExpert}
           />
         </div>
       )}

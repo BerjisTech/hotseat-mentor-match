@@ -30,6 +30,7 @@ const App = () => (
               <Route path="profile" element={<Profile />} />
               <Route path="admin/*" element={<Admin />} />
               <Route path="call/:id" element={<CallRoom />} />
+              <Route path="call-ended/:id" element={<CallRoom />} />
               <Route path="login" element={<Login />} />
               <Route path="*" element={<NotFound />} />
             </Route>
