@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -21,14 +20,13 @@ import { Outlet, Routes, Route, Link, useLocation } from "react-router-dom";
 import UsersTab from "@/components/admin/UsersTab";
 import CallsTab from "@/components/admin/CallsTab";
 import TagsTab from "@/components/admin/TagsTab";
-import AdminControls from "@/components/admin/AdminControls";
+import AdminControls from "@/components/home/AdminControls";
 
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
 
-  // Check if user is admin
   const { data: currentUser, isLoading: userLoading } = useQuery({
     queryKey: ['adminUser'],
     queryFn: async () => {
@@ -166,7 +164,23 @@ const AdminDashboard = () => {
     queryKey: ['adminUser'],
   });
   
-  // This will be displayed on the main admin route
+  const mockExperts = [
+    { 
+      id: '1', 
+      name: 'John Doe', 
+      isAvailable: true 
+    },
+    { 
+      id: '2', 
+      name: 'Jane Smith', 
+      isAvailable: false 
+    }
+  ];
+
+  const handleUpdateExperts = (experts: any[]) => {
+    console.log('Experts updated:', experts);
+  };
+  
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
@@ -197,7 +211,10 @@ const AdminDashboard = () => {
         </Link>
       </div>
       
-      <AdminControls experts={[]} onUpdateExperts={() => {}} />
+      <AdminControls 
+        experts={mockExperts} 
+        onUpdateExperts={handleUpdateExperts} 
+      />
     </div>
   );
 };
