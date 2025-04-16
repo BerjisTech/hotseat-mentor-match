@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import SearchBar from "@/components/home/SearchBar";
 import HeroSection from "@/components/home/HeroSection";
@@ -6,109 +7,75 @@ import AvailabilityToggle from "@/components/home/AvailabilityToggle";
 import TagFilter from "@/components/TagFilter";
 import AIAssist from "@/components/AIAssist";
 import { ExpertProps } from "@/components/ExpertCard";
-
-// Mock data for experts (keep for now until we integrate with backend)
-const mockExperts = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    profileImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    bio: "Full-stack developer specializing in React, Node.js, and cloud architecture. 8+ years experience building scalable applications.",
-    tags: ["react", "javascript", "node.js", "aws", "typescript"],
-    isAvailable: true,
-    callCount: 24,
-    averageRating: 4.8,
-  },
-  {
-    id: "2",
-    name: "Sara Lee",
-    profileImage: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    bio: "Product manager with expertise in SaaS and consumer apps. I can help with product strategy, UX research, and growth tactics.",
-    tags: ["product-management", "ux", "saas", "growth", "mvp"],
-    isAvailable: true,
-    callCount: 16,
-    averageRating: 4.9,
-  },
-  {
-    id: "3",
-    name: "Michael Chen",
-    profileImage: "https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    bio: "Machine learning engineer focusing on NLP and computer vision. Can help with model training, deployment, and AI infrastructure.",
-    tags: ["machine-learning", "python", "tensorflow", "nlp", "ai"],
-    isAvailable: false,
-    callCount: 31,
-    averageRating: 4.7,
-  },
-  {
-    id: "4",
-    name: "Emma Williams",
-    profileImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    bio: "UI/UX designer passionate about accessible interfaces and design systems. 6 years experience with Figma and design tools.",
-    tags: ["ui-design", "ux-design", "figma", "accessibility", "design-systems"],
-    isAvailable: true,
-    callCount: 19,
-    averageRating: 4.6,
-  },
-  {
-    id: "5",
-    name: "James Rodriguez",
-    profileImage: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-    bio: "Marketing specialist with focus on SEO, content strategy, and social media campaigns. I help businesses increase their online visibility.",
-    tags: ["marketing", "seo", "content", "social-media", "growth-hacking"],
-    isAvailable: false,
-    callCount: 12,
-    averageRating: 4.5,
-  },
-];
-
-// Get all unique tags from experts
-const allTags = Array.from(
-  new Set(mockExperts.flatMap((expert) => expert.tags))
-).sort();
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [filteredExperts, setFilteredExperts] = useState<ExpertProps[]>(mockExperts);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-  const [experts, setExperts] = useState<ExpertProps[]>(mockExperts);
+
+  // Fetch experts from Supabase
+  const { data: experts = [], isLoading } = useQuery({
+    queryKey: ['experts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, bio, avatar_url, is_available, user_expertise_tags(expertise_tags(name))')
+        .eq('role', 'expert');
+
+      if (error) throw error;
+
+      return data.map((profile): ExpertProps => ({
+        id: profile.id,
+        name: profile.full_name || 'Anonymous Expert',
+        profileImage: profile.avatar_url,
+        bio: profile.bio || 'No bio available',
+        tags: profile.user_expertise_tags?.map(tag => tag.expertise_tags.name) || [],
+        isAvailable: profile.is_available || false,
+      }));
+    },
+  });
 
   // Filter experts based on search term, selected tags, and availability
-  useEffect(() => {
-    let filtered = experts;
-    
+  const filteredExperts = experts.filter(expert => {
+    // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (expert) =>
-          expert.name.toLowerCase().includes(term) ||
-          expert.bio.toLowerCase().includes(term) ||
-          expert.tags.some((tag) => tag.includes(term))
-      );
+      if (
+        !expert.name.toLowerCase().includes(term) &&
+        !expert.bio.toLowerCase().includes(term) &&
+        !expert.tags.some(tag => tag.toLowerCase().includes(term))
+      ) {
+        return false;
+      }
     }
     
+    // Filter by selected tags
     if (selectedTags.length > 0) {
-      filtered = filtered.filter((expert) =>
-        selectedTags.every((tag) => expert.tags.includes(tag))
-      );
+      if (!selectedTags.every(tag => expert.tags.includes(tag))) {
+        return false;
+      }
     }
     
-    if (showOnlyAvailable) {
-      filtered = filtered.filter((expert) => expert.isAvailable);
+    // Filter by availability
+    if (showOnlyAvailable && !expert.isAvailable) {
+      return false;
     }
     
-    setFilteredExperts(filtered);
-  }, [searchTerm, selectedTags, showOnlyAvailable, experts]);
+    return true;
+  });
 
-  // Handle the AI assistant submission (placeholder)
+  // Get all unique tags from experts for the tag filter
+  const allTags = Array.from(
+    new Set(experts.flatMap(expert => expert.tags))
+  ).sort();
+
+  // Handle the AI assistant submission
   const handleAIAssist = async (input: string): Promise<string> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve(`Based on your request "${input}", I recommend:
-        
-1. Try experts with the #javascript, #react, and #frontend tags
-2. Be specific about your code error to get faster help
-3. Consider including a code snippet when you join the call`);
+        resolve(`Based on your request "${input}", I recommend trying experts with relevant expertise tags and including specific details about what you need help with.`);
       }, 1500);
     });
   };
@@ -140,7 +107,11 @@ const Home = () => {
             onClearTags={() => setSelectedTags([])}
           />
           
-          <ExpertList experts={filteredExperts} />
+          {isLoading ? (
+            <div className="text-center py-8">Loading experts...</div>
+          ) : (
+            <ExpertList experts={filteredExperts} />
+          )}
         </div>
         
         <div>

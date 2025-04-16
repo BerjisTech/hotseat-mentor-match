@@ -4,31 +4,46 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, Phone, Tags } from "lucide-react";
 import AdminControls from "@/components/home/AdminControls";
 import { ExpertProps } from "@/components/ExpertCard";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminDashboard = () => {
   const { data: currentUser } = useQuery({
     queryKey: ['adminUser'],
   });
   
-  const mockExperts: ExpertProps[] = [
-    { 
-      id: '1', 
-      name: 'John Doe',
-      bio: 'Expert in software development',
-      tags: ['JavaScript', 'React'],
-      isAvailable: true 
-    },
-    { 
-      id: '2', 
-      name: 'Jane Smith',
-      bio: 'Expert in design',
-      tags: ['UI/UX', 'Design Systems'],
-      isAvailable: false 
-    }
-  ];
+  // Fetch experts from Supabase
+  const { data: experts = [] } = useQuery({
+    queryKey: ['adminExperts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, bio, is_available, user_expertise_tags(expertise_tags(name))')
+        .eq('role', 'expert');
 
-  const handleUpdateExperts = (experts: ExpertProps[]) => {
-    console.log('Experts updated:', experts);
+      if (error) throw error;
+
+      return data.map((profile): ExpertProps => ({
+        id: profile.id,
+        name: profile.full_name || 'Anonymous Expert',
+        bio: profile.bio || 'No bio available',
+        tags: profile.user_expertise_tags?.map(tag => tag.expertise_tags.name) || [],
+        isAvailable: profile.is_available || false,
+      }));
+    },
+  });
+
+  const handleUpdateExperts = async (updatedExperts: ExpertProps[]) => {
+    // Update experts in Supabase
+    for (const expert of updatedExperts) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_available: expert.isAvailable })
+        .eq('id', expert.id);
+
+      if (error) {
+        console.error('Error updating expert:', error);
+      }
+    }
   };
   
   return (
@@ -62,7 +77,7 @@ const AdminDashboard = () => {
       </div>
       
       <AdminControls 
-        experts={mockExperts}
+        experts={experts}
         onUpdateExperts={handleUpdateExperts}
       />
     </div>
