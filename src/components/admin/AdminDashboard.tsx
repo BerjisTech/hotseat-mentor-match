@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Phone, Tags } from "lucide-react";
 import AdminControls from "@/components/home/AdminControls";
+import { ExpertProps } from "@/components/ExpertCard";
 
 const AdminDashboard = () => {
   const { data: currentUser } = useQuery({
     queryKey: ['adminUser'],
   });
   
-  const mockExperts = [
+  const mockExperts: ExpertProps[] = [
     { 
       id: '1', 
       name: 'John Doe',
@@ -26,7 +27,7 @@ const AdminDashboard = () => {
     }
   ];
 
-  const handleUpdateExperts = (experts: any[]) => {
+  const handleUpdateExperts = (experts: ExpertProps[]) => {
     console.log('Experts updated:', experts);
   };
   
