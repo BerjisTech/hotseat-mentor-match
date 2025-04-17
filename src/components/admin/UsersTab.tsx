@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal, UserCheck } from "lucide-react";
+import { Search, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,23 +37,6 @@ const UsersTab = () => {
   // Fetch current user from the React Query cache
   const { data: currentUser } = useQuery({
     queryKey: ['adminUser'],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/login');
-        return null;
-      }
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-        
-      if (error) throw error;
-      
-      return data as ProfileWithRole;
-    },
   });
 
   // Properly typed currentUser
@@ -229,6 +212,7 @@ const UsersTab = () => {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => navigate(`/profile/${user.id}`)}
+                          disabled
                         >
                           View Profile
                         </DropdownMenuItem>
