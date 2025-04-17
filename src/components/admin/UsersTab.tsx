@@ -37,6 +37,23 @@ const UsersTab = () => {
   // Fetch current user from the React Query cache
   const { data: currentUser } = useQuery({
     queryKey: ['adminUser'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/login');
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (error) throw error;
+      
+      return data as ProfileWithRole;
+    },
   });
 
   // Properly typed currentUser
