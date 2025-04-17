@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Search, MoreHorizontal } from "lucide-react";
+import { Search, MoreHorizontal, UserCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -212,7 +212,6 @@ const UsersTab = () => {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => navigate(`/profile/${user.id}`)}
-                          disabled
                         >
                           View Profile
                         </DropdownMenuItem>
